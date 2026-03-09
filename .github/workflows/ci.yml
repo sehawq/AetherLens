@@ -35,14 +35,18 @@ jobs:
       shell: powershell
       run: |
         Invoke-WebRequest -Uri https://nmap.org/npcap/dist/npcap-sdk-1.13.zip -OutFile npcap-sdk.zip
-        Expand-Archive npcap-sdk.zip -DestinationPath .
-        $sdkDir = Get-ChildItem -Directory | Where-Object { $_.Name -like "npcap-sdk-*" } | Select-Object -First 1
-        if ($sdkDir) {
-          if ($sdkDir.Name -ne "npcap-sdk") {
-            Rename-Item -Path $sdkDir.FullName -NewName "npcap-sdk"
-          }
+        Expand-Archive npcap-sdk.zip -DestinationPath npcap-sdk-extract
+        
+        if (Test-Path "npcap-sdk-extract/Lib") {
+          Rename-Item -Path "npcap-sdk-extract" -NewName "npcap-sdk"
         } else {
-          Write-Error "Could not find extracted Npcap SDK directory"
+          $sdkDir = Get-ChildItem -Path "npcap-sdk-extract" -Directory | Where-Object { Test-Path "$($_.FullName)/Lib" } | Select-Object -First 1
+          if ($sdkDir) {
+            Move-Item -Path $sdkDir.FullName -Destination "npcap-sdk"
+          } else {
+            Write-Error "Could not find Npcap SDK Lib directory"
+            exit 1
+          }
         }
 
     - name: Check Formatting
