@@ -1,0 +1,29 @@
+[package]
+name = "aether_core"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+packet-capture = ["dep:pnet"]
+libpcap = ["packet-capture", "dep:pcap"]
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tonic = "0.12"
+prost = "0.13"
+prost-types = "0.13"
+tokio-stream = { version = "0.1", features = ["sync"] }
+compact_str = { version = "0.8", features = ["serde"] }
+pnet = { version = "0.35", optional = true }
+pcap = { version = "2.2", optional = true }
+dashmap = "6.1.0"
+windows-sys = { version = "0.61.2", features = ["Win32_NetworkManagement_IpHelper", "Win32_System_ProcessStatus", "Win32_Foundation", "Win32_System_Threading", "Win32_NetworkManagement_Ndis", "Win32_System_Diagnostics_ToolHelp", "Win32_Networking_WinSock"] }
+dotenv = "0.15.0"
+
+[build-dependencies]
+tonic-build = "0.12"
+prost-build = "0.13"

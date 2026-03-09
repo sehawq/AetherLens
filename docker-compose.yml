@@ -1,0 +1,44 @@
+services:
+  core-engine:
+    build: ./core-engine
+    environment:
+      - CORE_GRPC_HOST=0.0.0.0
+      - CORE_GRPC_PORT=50051
+      - DEMO_MODE=true # Default to Demo Mode for Docker (no raw socket access required)
+    ports:
+      - "50051:50051"
+    networks:
+      - aether-net
+
+  api-server:
+    build: ./api-server
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - CoreService__GrpcUrl=http://core-engine:50051
+      - ConnectionStrings__LocalDb=Data Source=/data/aether.db
+    ports:
+      - "5000:5000"
+    volumes:
+      - aether-data:/data
+    depends_on:
+      - core-engine
+    networks:
+      - aether-net
+
+  web-dashboard:
+    build: ./web-dashboard
+    environment:
+      - NEXT_PUBLIC_SIGNALR_URL=http://localhost:5000/hubs/aether-lens
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-server
+    networks:
+      - aether-net
+
+networks:
+  aether-net:
+    driver: bridge
+
+volumes:
+  aether-data:

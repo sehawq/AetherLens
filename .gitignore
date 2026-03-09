@@ -1,0 +1,43 @@
+# General
+.DS_Store
+.vscode/
+.idea/
+*.user
+*.suo
+.trae/
+.env
+
+# Logs & Temp
+*.log
+*.txt
+*.tmp
+*.bak
+*.md.bak
+
+# Dependencies & Build Artifacts
+npcap-sdk/
+node_modules/
+target/
+bin/
+obj/
+.vs/
+out/
+build/
+dist/
+.next/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Local Configuration
+appsettings.Development.json
+.env.local
+package-lock.json
+yarn.lock
+
+# Scripts
+*.ps1
+# Allow start_lab.bat
+!start_lab.bat

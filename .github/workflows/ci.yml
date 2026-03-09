@@ -1,0 +1,90 @@
+name: AetherLens CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  build-rust:
+    name: Build Rust Core
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
+    - name: Cache Cargo registry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          core-engine/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('core-engine/Cargo.lock') }}
+
+    - name: Download Npcap SDK
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Uri https://nmap.org/npcap/dist/npcap-sdk-1.13.zip -OutFile npcap-sdk.zip
+        Expand-Archive npcap-sdk.zip -DestinationPath .
+        Rename-Item -Path "npcap-sdk-1.13" -NewName "npcap-sdk"
+
+    - name: Check Formatting
+      run: cd core-engine && cargo fmt -- --check
+
+    - name: Clippy Lint
+      run: cd core-engine && cargo clippy -- -D warnings
+
+    - name: Run Tests
+      run: cd core-engine && cargo test --verbose
+
+    - name: Build Release
+      run: cd core-engine && cargo build --release --verbose
+
+  build-dotnet:
+    name: Build .NET Backend
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+        
+    - name: Restore Dependencies
+      run: cd api-server && dotnet restore
+      
+    - name: Build
+      run: cd api-server && dotnet build --no-restore --configuration Release
+
+  build-nextjs:
+    name: Build Next.js Dashboard
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: web-dashboard/package-lock.json
+        
+    - name: Install Dependencies
+      run: cd web-dashboard && npm ci
+      
+    - name: Lint
+      run: cd web-dashboard && npm run lint
+      
+    - name: Build
+      run: cd web-dashboard && npm run build

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package aether;
+
+option csharp_namespace = "AetherLens.Protos";
+
+message PacketMessage {
+  string process = 1;
+  string local_addr = 2;
+  string remote_addr = 3;
+  string protocol = 4;
+  uint64 bytes = 5;
+  uint64 timestamp = 6;
+  bool outbound = 7;
+}
+
+message SuspiciousConnectionMessage {
+  string process = 1;
+  string remote_addr = 2;
+  string reason = 3;
+  double score = 4;
+  uint64 timestamp = 5;
+}
+
+message SubscribeRequest {}
+
+service PacketService {
+  rpc SubscribePackets (SubscribeRequest) returns (stream PacketMessage);
+}
+
+service SuspiciousService {
+  rpc SubscribeSuspicious (SubscribeRequest) returns (stream SuspiciousConnectionMessage);
+}
