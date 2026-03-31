@@ -1,25 +1,42 @@
-# Build Stage
+# =========================
+# 🔧 Build Stage
+# =========================
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy csproj and restore
-COPY ["apex-backend.csproj", "./"]
-RUN dotnet restore "apex-backend.csproj"
+# ⚡ copy csproj trước để cache restore
+COPY apex-backend.csproj ./
+RUN dotnet restore apex-backend.csproj
 
-# Copy everything else and build
+# 📦 copy source
 COPY . .
-RUN dotnet publish "apex-backend.csproj" -c Release -o /app/publish
 
-# Runtime Stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+# ⚡ publish optimized
+RUN dotnet publish apex-backend.csproj \
+    -c Release \
+    -o /app/publish \
+    /p:UseAppHost=false
+
+# =========================
+# 🚀 Runtime Stage
+# =========================
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
+
+# 🔐 chạy non-root (best practice)
+RUN adduser --disabled-password --gecos "" appuser
+USER appuser
+
+# 📦 copy build output
 COPY --from=build /app/publish .
 
-# Expose ports
-EXPOSE 5000
+# 🌐 config
+ENV ASPNETCORE_URLS=http://+:5000 \
+    ASPNETCORE_ENVIRONMENT=Production \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true \
+    ConnectionStrings__LocalDb="Data Source=guardian.db"
 
-# Set environment variables
-ENV ASPNETCORE_URLS=http://+:5000
-ENV ConnectionStrings__LocalDb="Data Source=guardian.db"
+EXPOSE 5000
 
 ENTRYPOINT ["dotnet", "apex-backend.dll"]
