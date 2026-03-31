@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -7,54 +8,77 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn emit_windows_packet_sdk_links() {
-    if std::env::var_os("CARGO_CFG_WINDOWS").is_none() {
+    // 👉 chỉ chạy trên Windows + feature bật
+    if !cfg!(target_os = "windows") {
         return;
     }
     if std::env::var_os("CARGO_FEATURE_PACKET_CAPTURE").is_none() {
         return;
     }
 
-    let mut candidates = Vec::new();
+    let mut candidates: HashSet<PathBuf> = HashSet::new();
 
-    if let Some(sdk_dir) = std::env::var_os("NPCAP_SDK_DIR") {
-        let path = PathBuf::from(&sdk_dir);
-        // ... (removed print debugs for cleanliness)
-        candidates.push(path);
+    // 🔥 1. ENV override (ưu tiên cao nhất)
+    if let Some(dir) = std::env::var_os("NPCAP_SDK_DIR") {
+        candidates.insert(PathBuf::from(dir));
     }
 
-    // Auto-detect from project root (relative to core-engine/)
+    // 🔥 2. Detect theo workspace
     if let Ok(cwd) = std::env::current_dir() {
-        // core-engine/../npcap-sdk/Lib/x64
-        candidates.push(cwd.join("..").join("npcap-sdk").join("Lib").join("x64"));
-        // core-engine/../npcap-sdk/Lib
-        candidates.push(cwd.join("..").join("npcap-sdk").join("Lib"));
+        let base = cwd.join("..").join("npcap-sdk").join("Lib");
+        candidates.insert(base.clone());
+        candidates.insert(base.join(arch_subdir()));
     }
 
-    candidates.push(PathBuf::from(r"C:\Npcap-SDK\Lib"));
-    candidates.push(PathBuf::from(r"C:\Npcap\Lib"));
-    candidates.push(PathBuf::from(r"C:\WpdPack\Lib"));
-    candidates.push(PathBuf::from(r"C:\WpdPack\Lib\x64"));
-    candidates.push(PathBuf::from(r"C:\Program Files\Npcap-SDK\Lib"));
-    candidates.push(PathBuf::from(r"C:\Program Files (x86)\Npcap-SDK\Lib"));
+    // 🔥 3. Default install paths
+    let common_paths = [
+        r"C:\Npcap-SDK\Lib",
+        r"C:\Npcap\Lib",
+        r"C:\WpdPack\Lib",
+        r"C:\Program Files\Npcap-SDK\Lib",
+        r"C:\Program Files (x86)\Npcap-SDK\Lib",
+    ];
 
-    if let Some(program_files) = std::env::var_os("ProgramFiles") {
-        candidates.push(Path::new(&program_files).join("Npcap-SDK").join("Lib"));
+    for p in common_paths {
+        candidates.insert(PathBuf::from(p));
+        candidates.insert(PathBuf::from(p).join(arch_subdir()));
     }
 
-    if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
-        candidates.push(Path::new(&program_files_x86).join("Npcap-SDK").join("Lib"));
+    // 🔥 4. ProgramFiles dynamic
+    if let Some(pf) = std::env::var_os("ProgramFiles") {
+        candidates.insert(Path::new(&pf).join("Npcap-SDK").join("Lib"));
     }
 
-    let selected = candidates
-        .into_iter()
-        .find(|path| path.join("Packet.lib").exists() && path.join("wpcap.lib").exists());
+    if let Some(pf86) = std::env::var_os("ProgramFiles(x86)") {
+        candidates.insert(Path::new(&pf86).join("Npcap-SDK").join("Lib"));
+    }
 
-    if let Some(path) = selected {
-        println!("cargo:rustc-link-search=native={}", path.display());
-        println!("cargo:rustc-link-lib=dylib=Packet");
-        println!("cargo:rustc-link-lib=dylib=wpcap");
-        println!("cargo:warning=Npcap SDK found at {}", path.display());
-    } else {
-        println!("cargo:warning=Npcap SDK libs not found; set NPCAP_SDK_DIR to a Lib folder containing Packet.lib and wpcap.lib");
+    // 🔥 5. Find valid SDK
+    let selected = candidates.into_iter().find(|p| has_required_libs(p));
+
+    match selected {
+        Some(path) => {
+            println!("cargo:rustc-link-search=native={}", path.display());
+            println!("cargo:rustc-link-lib=dylib=Packet");
+            println!("cargo:rustc-link-lib=dylib=wpcap");
+
+            println!("cargo:warning=Npcap SDK found at {}", path.display());
+        }
+        None => {
+            println!("cargo:warning=Npcap SDK not found!");
+            println!("cargo:warning=Set NPCAP_SDK_DIR to folder containing Packet.lib + wpcap.lib");
+        }
+    }
+}
+
+fn has_required_libs(path: &Path) -> bool {
+    path.join("Packet.lib").exists() && path.join("wpcap.lib").exists()
+}
+
+fn arch_subdir() -> &'static str {
+    match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+        Ok("x86_64") => "x64",
+        Ok("x86") => "x86",
+        _ => "",
     }
 }
